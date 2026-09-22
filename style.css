@@ -1,0 +1,93 @@
+body {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+    padding: 1.5rem;
+    background: #f5f6f8;
+    color: #1a1a1a;
+}
+
+h1 {
+    font-size: 1.4rem;
+    margin-bottom: 0.25rem;
+}
+
+#toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin: 1rem 0;
+}
+
+#toolbar button, #toolbar input[type="file"] {
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background: white;
+    cursor: pointer;
+}
+
+#toolbar button:hover {
+    background: #eee;
+}
+
+#status {
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 0.5rem;
+    min-height: 1.2em;
+}
+
+#table-wrapper {
+    overflow: auto;
+    max-height: 70vh;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+th, td {
+    border: 1px solid #e0e0e0;
+    padding: 2px 4px;
+    white-space: nowrap;
+}
+
+th {
+    background: #f0f2f5;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+td input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-size: 0.85rem;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+td input:focus {
+    background: #fff8dc;
+    outline: 1px solid #f0c419;
+}
+
+.row-actions button {
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: #b00020;
+    font-weight: bold;
+}
+
+#loading {
+    font-style: italic;
+    color: #888;
+}

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GTF Editor</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://pyscript.net/releases/2024.11.1/core.css">
+<script type="module" src="https://pyscript.net/releases/2024.11.1/core.js"></script>
+</head>
+<body>
+<h1>GTF Editor</h1>
+<p>Load a <code>.gtf</code>/<code>.gff</code> file, edit annotation rows in the browser, and export the result. All parsing runs client-side via PyScript/pandas &mdash; no server upload.</p>
+
+<div id="toolbar">
+    <input type="file" id="file-input" accept=".gtf,.gff,.gff3,.txt">
+    <button id="add-row-btn" disabled>Add row</button>
+    <button id="download-btn" disabled>Download .gtf</button>
+</div>
+
+<div id="status">
+    <span id="loading">Loading Python runtime&hellip;</span>
+</div>
+
+<div id="table-wrapper">
+    <div id="table-container"></div>
+</div>
+
+<script type="py" src="./main.py" config="./pyscript.toml"></script>
+</body>
+</html>
