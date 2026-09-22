@@ -5,6 +5,8 @@ users download the edited result. Everything runs client-side in the browser,
 without pandas or any server-side code.
 """
 
+import gzip
+
 import js
 from pyodide.ffi import create_proxy
 from pyscript import document, when
@@ -118,6 +120,22 @@ def add_row(event=None) -> None:
     set_status(f"Added row. {len(rows)} rows total.")
 
 
+async def read_uploaded_text(file) -> str:
+    """Read uploaded text, supporting plain text and gzip-compressed .gtf/.gff files."""
+    array_buffer = await file.arrayBuffer()
+    uint8_array = js.Uint8Array.new(array_buffer)
+    raw = uint8_array.to_py()
+
+    if file.name.lower().endswith(".gz"):
+        try:
+            payload = gzip.decompress(bytes(raw))
+        except gzip.BadGzipFile:
+            raise ValueError(f"Could not read gzip-compressed file: {file.name}")
+        return payload.decode("utf-8", errors="replace")
+
+    return bytes(raw).decode("utf-8", errors="replace")
+
+
 @when("change", "#file-input")
 async def on_file_selected(event) -> None:
     global rows, header_lines, current_filename
@@ -127,7 +145,12 @@ async def on_file_selected(event) -> None:
     file = files.item(0)
     current_filename = file.name
     set_status(f"Reading {file.name}...")
-    text = await file.text()
+    try:
+        text = await read_uploaded_text(file)
+    except Exception as exc:  # pragma: no cover - browser runtime feedback only
+        set_status(f"Failed to read {file.name}: {exc}")
+        return
+
     header_lines, rows = parse_gtf(text)
     render_table()
     add_row_btn.disabled = False
