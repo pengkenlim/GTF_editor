@@ -1,14 +1,11 @@
 """PyScript GTF (Gene Transfer Format) editor.
 
-Loads a GTF/GFF file in the browser, shows it as an editable table backed by
-a pandas DataFrame, and lets the user download the edited result. Everything
-runs client-side in the browser via Pyodide - no server round trip.
+Loads a GTF/GFF file in the browser, shows it as an editable table, and lets
+users download the edited result. Everything runs client-side in the browser,
+without pandas or any server-side code.
 """
 
-import io
-
 import js
-import pandas as pd
 from pyodide.ffi import create_proxy
 from pyscript import document, when
 
@@ -17,8 +14,8 @@ GTF_COLUMNS = [
     "score", "strand", "frame", "attribute",
 ]
 
-# In-memory app state.
-df = pd.DataFrame(columns=GTF_COLUMNS)
+# In-memory app state stored as a list of dictionaries for browser use.
+rows: list[dict[str, str]] = []
 header_lines: list[str] = []
 current_filename = "edited.gtf"
 
@@ -32,10 +29,10 @@ def set_status(message: str) -> None:
     status_el.innerHTML = f"<span>{message}</span>"
 
 
-def parse_gtf(text: str) -> tuple[list[str], pd.DataFrame]:
-    """Split a GTF/GFF file into its comment header lines and a data frame."""
+def parse_gtf(text: str) -> tuple[list[str], list[dict[str, str]]]:
+    """Split a GTF/GFF file into header lines and a list of row dictionaries."""
     comments = []
-    rows = []
+    parsed_rows = []
     for line in text.splitlines():
         if not line.strip():
             continue
@@ -43,24 +40,22 @@ def parse_gtf(text: str) -> tuple[list[str], pd.DataFrame]:
             comments.append(line)
             continue
         fields = line.split("\t")
-        # Pad/truncate to the expected 9 GTF columns so malformed lines don't crash the table.
         fields = (fields + [""] * len(GTF_COLUMNS))[: len(GTF_COLUMNS)]
-        rows.append(fields)
-    frame = pd.DataFrame(rows, columns=GTF_COLUMNS)
-    return comments, frame
+        parsed_rows.append({col: value for col, value in zip(GTF_COLUMNS, fields)})
+    return comments, parsed_rows
 
 
 def render_table() -> None:
-    if df.empty:
+    if not rows:
         table_container.innerHTML = "<p>No rows loaded yet.</p>"
         return
 
     head = "".join(f"<th>{col}</th>" for col in GTF_COLUMNS) + "<th></th>"
     body_rows = []
-    for row_idx, row in enumerate(df.itertuples(index=False)):
+    for row_idx, row in enumerate(rows):
         cells = "".join(
-            f'<td><input class="cell-input" data-row="{row_idx}" data-col="{col_idx}" value="{_escape(value)}"></td>'
-            for col_idx, value in enumerate(row)
+            f'<td><input class="cell-input" data-row="{row_idx}" data-col="{col_idx}" value="{_escape(row.get(col, ""))}"></td>'
+            for col_idx, col in enumerate(GTF_COLUMNS)
         )
         delete_cell = (
             f'<td class="row-actions">'
@@ -86,12 +81,12 @@ def _escape(value) -> str:
 
 def _table_input_handler(event) -> None:
     target = event.target
-    class_list = target.classList
-    if not class_list.contains("cell-input"):
+    if not target.classList.contains("cell-input"):
         return
     row_idx = int(target.dataset.row)
     col_idx = int(target.dataset.col)
-    df.iat[row_idx, col_idx] = target.value
+    col_name = GTF_COLUMNS[col_idx]
+    rows[row_idx][col_name] = target.value
 
 
 def _table_click_handler(event) -> None:
@@ -103,28 +98,29 @@ def _table_click_handler(event) -> None:
 
 
 def delete_row(row_idx: int) -> None:
-    global df
-    df = df.drop(df.index[row_idx]).reset_index(drop=True)
+    global rows
+    if 0 <= row_idx < len(rows):
+        del rows[row_idx]
     render_table()
-    set_status(f"Deleted row {row_idx}. {len(df)} rows remaining.")
+    set_status(f"Deleted row {row_idx}. {len(rows)} rows remaining.")
 
 
 @when("click", "#add-row-btn")
 def add_row(event=None) -> None:
-    global df
+    global rows
     blank = {
         "seqname": "chr1", "source": "pyscript", "feature": "exon",
         "start": "1", "end": "1", "score": ".", "strand": "+",
         "frame": ".", "attribute": "",
     }
-    df.loc[len(df)] = blank
+    rows.append(blank)
     render_table()
-    set_status(f"Added row. {len(df)} rows total.")
+    set_status(f"Added row. {len(rows)} rows total.")
 
 
 @when("change", "#file-input")
 async def on_file_selected(event) -> None:
-    global df, header_lines, current_filename
+    global rows, header_lines, current_filename
     files = event.target.files
     if not files or files.length == 0:
         return
@@ -132,18 +128,18 @@ async def on_file_selected(event) -> None:
     current_filename = file.name
     set_status(f"Reading {file.name}...")
     text = await file.text()
-    header_lines, df = parse_gtf(text)
+    header_lines, rows = parse_gtf(text)
     render_table()
     add_row_btn.disabled = False
     download_btn.disabled = False
-    set_status(f"Loaded {file.name}: {len(df)} feature rows, {len(header_lines)} header lines.")
+    set_status(f"Loaded {file.name}: {len(rows)} feature rows, {len(header_lines)} header lines.")
 
 
 @when("click", "#download-btn")
 def download_gtf(event=None) -> None:
     lines = list(header_lines)
-    for row in df.itertuples(index=False):
-        lines.append("\t".join(str(value) for value in row))
+    for row in rows:
+        lines.append("\t".join(str(row.get(col, "")) for col in GTF_COLUMNS))
     text = "\n".join(lines) + "\n"
 
     blob = js.Blob.new([text], {"type": "text/plain"})
